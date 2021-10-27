@@ -21,34 +21,35 @@
 const char *getUserName(int id) {
     uid_t uid = id;
     struct passwd *pw = getpwuid(uid);
-    if (pw)
-    {
-        return pw->pw_name;
-    }
+    if (pw) return pw->pw_name;
     return "";
 }
 
 const char *getGroupName(int id) {
     gid_t gid = id;
     struct group *gr = getgrgid(gid);
-    if (gr)
-    {
-        return gr->gr_name;
-    }
+    if (gr) return gr->gr_name;
     return "";
-
 }
 
-void PrintFileInfo(int op_l,char* name){
+char* statModeToStr(int stat_mode){
+    if (stat_mode & S_IFREG)return "file";
+    if (stat_mode & S_IFDIR)return "directory";
+    //printf("%d",stat_mode);
+    return "UNKNOWN";
+}
+
+void PrintFileInfo(const char* name,int op_l){
+    //printf("!%s!",name);
     struct stat s;
     if( stat(name,&s) == 0 )
     {
         if(!op_l){
             printf("%s ",name);
         } else {
-            printf("%s %d %ld %ld %s %s \n",
-                          name,s.st_mode,s.st_nlink,s.st_size,
-                          getUserName(s.st_uid),getGroupName(s.st_gid));
+            printf("%s mode:%s nlink:%ld size:%ld uid:%s gid:%s \n",
+                   name,statModeToStr(s.st_mode),s.st_nlink,s.st_size,
+                   getUserName(s.st_uid),getGroupName(s.st_gid));
         }
 
     } else {
@@ -82,45 +83,50 @@ void _ls(const char *dir,int op_a,int op_l,int op_R)
                 //If hidden files are found we continue
                 if (!op_a && d->d_name[0] == '.')
                     continue;
-                printf("%s  ", d->d_name);
-                if(op_l) printf("\n");
+                PrintFileInfo(d->d_name,op_l);
             }
             if(!op_l)
                 printf("\n");
+            
+            if (op_R){
+                //recursive
+                // opening the same folder to check all the dirs
+                DIR *dh = opendir(dir);
+                if (!dh){
+                    (errno == ENOENT) ? perror("Directory doesn't exist"):perror("Unable to read directory");
+                    exit(EXIT_FAILURE);
+                }
+                while ((d = readdir(dh)) != NULL){
+                    if (d->d_type & DT_DIR ){
+                        if ((!op_a && d->d_name[0] == '.') || !strcmp(d->d_name,"..") || !strcmp(d->d_name,"."))
+                            continue;
+                        printf("./%s:\n",d->d_name);
+                        char strrr[512]  = {};
+                        strcpy(strrr,dir);strcat(strrr,"/");strcat(strrr,d->d_name);
+                        _ls(d->d_name,op_a,op_l,op_R);
+                    }
+                }
+            }
         }
-        else if( s.st_mode & S_IFREG )
-        {
+        else if( s.st_mode & S_IFREG ) {
             //it's a file
-            printf("%s %d %ld %ld %s %s \n",
-                   dir,s.st_mode,s.st_nlink,s.st_size,
-                   getUserName(s.st_uid),getGroupName(s.st_gid));
+            PrintFileInfo(dir,op_l);
+            printf("\n");
         }
-        else
-        {
+        else {
             //something else
             perror("wtf is this path?");
         }
     }
-    else
-    {
+    else {
         //error
         perror("stats unavailable");
     }
-
-
-
-
-
-
-
-
-
 }
 
-//TODO R option , several options and
 int main(int argc, const char *argv[])
 {
-    printf("%d\n",argc);
+    //printf("%d\n",argc);
     int op_a = 0, op_l = 0, op_R = 0, path_index = 0;
     if (argc > 1) {
         for (int i=1; i <= argc-1; i++)
@@ -135,12 +141,10 @@ int main(int argc, const char *argv[])
                     perror("Option not available");
                     exit(EXIT_FAILURE);
                 }
-                //_ls(".",op_a,op_l);
             } else {
                 path_index = i;
             }
     }
     path_index ? _ls(argv[path_index],op_a,op_l,op_R) : _ls(".",op_a,op_l,op_R) ;
-
     return 0;
 }
