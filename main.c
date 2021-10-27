@@ -39,16 +39,18 @@ char* statModeToStr(int stat_mode){
     return "UNKNOWN";
 }
 
-void PrintFileInfo(const char* name,int op_l){
+void PrintFileInfo(const char* path,int op_l){
     //printf("!%s!",name);
+    //full path comes in,only name comes out , GENIOUS!!!!
     struct stat s;
-    if( stat(name,&s) == 0 )
+    if( stat(path,&s) == 0 )
     {
+        char* tmp = strrchr(path,'/')+1;
         if(!op_l){
-            printf("%s ",name);
+            printf("%s ",tmp);
         } else {
             printf("%s mode:%s nlink:%ld size:%ld uid:%s gid:%s \n",
-                   name,statModeToStr(s.st_mode),s.st_nlink,s.st_size,
+                   tmp,statModeToStr(s.st_mode),s.st_nlink,s.st_size,
                    getUserName(s.st_uid),getGroupName(s.st_gid));
         }
 
@@ -83,11 +85,13 @@ void _ls(const char *dir,int op_a,int op_l,int op_R)
                 //If hidden files are found we continue
                 if (!op_a && d->d_name[0] == '.')
                     continue;
-                PrintFileInfo(d->d_name,op_l);
+                char path[512];
+                sprintf(path,"%s/%s%c",dir,d->d_name,'\0');
+                PrintFileInfo(path,op_l);
             }
             if(!op_l)
                 printf("\n");
-            
+
             if (op_R){
                 //recursive
                 // opening the same folder to check all the dirs
@@ -101,9 +105,10 @@ void _ls(const char *dir,int op_a,int op_l,int op_R)
                         if ((!op_a && d->d_name[0] == '.') || !strcmp(d->d_name,"..") || !strcmp(d->d_name,"."))
                             continue;
                         printf("./%s:\n",d->d_name);
-                        char strrr[512]  = {};
-                        strcpy(strrr,dir);strcat(strrr,"/");strcat(strrr,d->d_name);
-                        _ls(d->d_name,op_a,op_l,op_R);
+                        char path[512];
+                        sprintf(path,"%s/%s%c",dir,d->d_name,'\0');
+                        //_ls(d->d_name,op_a,op_l,op_R);
+                        _ls(path,op_a,op_l,op_R);
                     }
                 }
             }
